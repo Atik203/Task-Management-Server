@@ -28,7 +28,26 @@ const client = new MongoClient(uri, {
 });
 
 async function run() {
+  const userCollection = client.db("Task-Management").collection("Users");
+
   try {
+    app.post("/users", async (req, res) => {
+      try {
+        const user = req.body;
+        const query = { email: user.email };
+        const isExist = await userCollection.findOne(query);
+        if (isExist) {
+          return res.send({ message: "user exists", insertedId: null });
+        }
+        const result = await userCollection.insertOne(user);
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
