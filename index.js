@@ -29,6 +29,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   const userCollection = client.db("Task-Management").collection("Users");
+  const taskCollection = client.db("Task-Management").collection("Tasks");
 
   try {
     app.post("/users", async (req, res) => {
@@ -46,6 +47,19 @@ async function run() {
 
         res.status(500).json({ error: "Internal server error" });
       }
+    });
+
+    app.post("/tasks", async (req, res) => {
+      const data = req.body;
+      const result = await taskCollection.insertOne(data);
+      res.send(result);
+    });
+
+    app.get("/task/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await taskCollection.find(query).toArray();
+      res.send(result);
     });
 
     await client.db("admin").command({ ping: 1 });
