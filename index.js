@@ -28,6 +28,21 @@ const client = new MongoClient(uri, {
 });
 
 async function run() {
+  const verifyToken = async (req, res, next) => {
+    const token = req.cookies?.token;
+
+    if (!token) {
+      return res.status(401).send({ message: "not authorized" });
+    }
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+      if (err) {
+        return res.status(401).send({ message: "not authorized" });
+      }
+      req.user = decoded;
+    });
+    next();
+  };
+
   const userCollection = client.db("Task-Management").collection("Users");
   const taskCollection = client.db("Task-Management").collection("Tasks");
 
@@ -48,7 +63,29 @@ async function run() {
         res.status(500).json({ error: "Internal server error" });
       }
     });
-
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1hr",
+      });
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production" ? true : false,
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
+    });
+    app.post("/logout", async (req, res) => {
+      const user = req.body;
+      res
+        .clearCookie("token", {
+          maxAge: 0,
+          secure: process.env.NODE_ENV === "production" ? true : false,
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
+    });
     app.post("/tasks", async (req, res) => {
       const data = req.body;
       const result = await taskCollection.insertOne(data);
@@ -60,6 +97,29 @@ async function run() {
       const query = { email: email };
       const result = await taskCollection.find(query).toArray();
       res.send(result);
+    });
+
+    app.delete("/task-delete/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await taskCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    app.patch("/update-status/:id", async (req, res) => {
+      const taskId = req.params.id;
+      const newStatus = req.body.newStatus;
+      const query = { _id: new ObjectId(taskId) };
+      const update = { $set: { status: newStatus } };
+      try {
+        const result = await taskCollection.updateOne(query, update);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res
+          .status(500)
+          .json({ success: false, message: "Internal server error" });
+      }
     });
 
     await client.db("admin").command({ ping: 1 });
