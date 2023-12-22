@@ -122,6 +122,38 @@ async function run() {
       }
     });
 
+    app.get("/singleTask/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await taskCollection.findOne(query);
+      res.send(result);
+    });
+    app.patch("/update-task/:id", async (req, res) => {
+      const taskId = req.params.id;
+      const { name, description, priority, category, deadline } = req.body;
+      console.log(name);
+      const query = { _id: new ObjectId(taskId) };
+      const update = {
+        $set: {
+          name: name,
+          description: description,
+          priority: priority,
+          category: category,
+          deadline: deadline,
+        },
+      };
+
+      try {
+        const result = await taskCollection.updateOne(query, update);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res
+          .status(500)
+          .json({ success: false, message: "Internal server error" });
+      }
+    });
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
