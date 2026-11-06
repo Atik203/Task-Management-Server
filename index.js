@@ -9,7 +9,7 @@ const port = process.env.PORT || 5000;
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://taskmanage.surge.sh/"],
+    origin: ["http://localhost:5173", "https://taskmanage.surge.sh"],
     credentials: true,
   })
 );
@@ -42,27 +42,12 @@ async function run() {
     });
     next();
   };
-
+  const reviewCollection = client.db("Task-Management").collection("reviews");
   const userCollection = client.db("Task-Management").collection("Users");
   const taskCollection = client.db("Task-Management").collection("Tasks");
+  const aboutUsCollection = client.db("Task-Management").collection("AboutUs");
 
   try {
-    app.post("/users", async (req, res) => {
-      try {
-        const user = req.body;
-        const query = { email: user.email };
-        const isExist = await userCollection.findOne(query);
-        if (isExist) {
-          return res.send({ message: "user exists", insertedId: null });
-        }
-        const result = await userCollection.insertOne(user);
-        res.send(result);
-      } catch (error) {
-        console.log(error);
-
-        res.status(500).json({ error: "Internal server error" });
-      }
-    });
     app.post("/jwt", async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
@@ -86,27 +71,52 @@ async function run() {
         })
         .send({ success: true });
     });
-    app.post("/tasks", async (req, res) => {
+
+    app.post("/users", async (req, res) => {
+      try {
+        const user = req.body;
+        const query = { email: user.email };
+        const isExist = await userCollection.findOne(query);
+        if (isExist) {
+          return res.send({ message: "user exists", insertedId: null });
+        }
+        const result = await userCollection.insertOne(user);
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
+    app.post("/tasks", verifyToken, async (req, res) => {
       const data = req.body;
       const result = await taskCollection.insertOne(data);
       res.send(result);
     });
 
-    app.get("/task/:email", async (req, res) => {
+    app.get("/task/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
       const result = await taskCollection.find(query).toArray();
       res.send(result);
     });
-
-    app.delete("/task-delete/:id", async (req, res) => {
+    app.get("/AboutUs", async (req, res) => {
+      const result = await aboutUsCollection.find().toArray();
+      res.send(result);
+    });
+    app.get("/review", async (req, res) => {
+      const result = await reviewCollection.find().toArray();
+      res.send(result);
+    });
+    app.delete("/task-delete/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await taskCollection.deleteOne(query);
       res.send(result);
     });
 
-    app.patch("/update-status/:id", async (req, res) => {
+    app.patch("/update-status/:id", verifyToken, async (req, res) => {
       const taskId = req.params.id;
       const newStatus = req.body.newStatus;
       const query = { _id: new ObjectId(taskId) };
@@ -122,13 +132,13 @@ async function run() {
       }
     });
 
-    app.get("/singleTask/:id", async (req, res) => {
+    app.get("/singleTask/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await taskCollection.findOne(query);
       res.send(result);
     });
-    app.patch("/update-task/:id", async (req, res) => {
+    app.patch("/update-task/:id", verifyToken, async (req, res) => {
       const taskId = req.params.id;
       const { name, description, priority, category, deadline } = req.body;
       console.log(name);
